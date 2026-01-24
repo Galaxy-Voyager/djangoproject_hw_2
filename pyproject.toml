@@ -1,16 +1,21 @@
 [project]
 name = "djangoproject-hw-2"
 version = "0.1.0"
-description = ""
+description = "Django LMS System"
 authors = [
-    {name = "Damir",email = "leheln16@gmail.com"}
+    {name = "Damir", email = "leheln16@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "Django>=5.0.0",
+    "djangorestframework>=3.14.0",
+    "Pillow>=10.0.0",
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.dependencies]
+python = "^3.13"
