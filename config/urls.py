@@ -24,17 +24,15 @@ from rest_framework.routers import DefaultRouter
 from lms.views import CourseViewSet
 from users.views import UserViewSet
 
-# Создаем роутер для ViewSet
 router = DefaultRouter()
 router.register(r"courses", CourseViewSet)
 router.register(r"users", UserViewSet)
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api/", include(router.urls)),
-    path("api/lessons/", include("lms.urls")),
+    path('admin/', admin.site.urls),
+    path('api/', include('lms.urls', namespace='lms')),
+    path('api/users/', include('users.urls', namespace='users')),
 ]
 
-# Добавляем поддержку медиа файлов в режиме разработки
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
