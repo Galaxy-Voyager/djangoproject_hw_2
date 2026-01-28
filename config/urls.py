@@ -29,9 +29,10 @@ router.register(r"courses", CourseViewSet)
 router.register(r"users", UserViewSet)
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('lms.urls', namespace='lms')),
-    path('api/users/', include('users.urls', namespace='users')),
+    path("admin/", admin.site.urls),
+    path("api/", include("lms.urls", namespace="lms")),
+    path("api/users/", include("users.urls", namespace="users")),
+    path("api/payments/", include("payments.urls", namespace="payments")),
 ]
 
 if settings.DEBUG:
