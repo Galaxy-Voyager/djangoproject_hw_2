@@ -50,3 +50,31 @@ class Lesson(models.Model):
 
     def __str__(self):
         return f"{self.title} (Курс: {self.course.title})"
+
+
+class Subscription(models.Model):
+    """Модель подписки пользователя на обновления курса"""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+        verbose_name="Пользователь"
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+        verbose_name="Курс"
+    )
+    subscribed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата подписки"
+    )
+
+    class Meta:
+        verbose_name = "Подписка"
+        verbose_name_plural = "Подписки"
+        unique_together = ['user', 'course']
+
+    def __str__(self):
+        return f"{self.user.email} подписан(а) на {self.course.title}"
