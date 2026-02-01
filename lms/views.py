@@ -8,8 +8,45 @@ from users.permissions import IsModerator, IsOwner
 from .models import Course, Lesson, Subscription
 from .serializers import CourseListSerializer, CourseDetailSerializer, LessonSerializer, SubscriptionSerializer
 from .paginators import CoursePagination, LessonPagination
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Список курсов",
+        description="Получение списка курсов с пагинацией. "
+                   "Обычные пользователи видят только свои курсы. "
+                   "Модераторы видят все курсы.",
+        parameters=[
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Количество элементов на странице (по умолчанию 5, максимум 20)'
+            ),
+        ]
+    ),
+    retrieve=extend_schema(
+        summary="Детали курса",
+        description="Получение детальной информации о курсе, включая все уроки и статус подписки"
+    ),
+    create=extend_schema(
+        summary="Создание курса",
+        description="Создание нового курса. Не доступно для модераторов."
+    ),
+    update=extend_schema(
+        summary="Обновление курса",
+        description="Полное обновление курса. Доступно владельцам и модераторам."
+    ),
+    partial_update=extend_schema(
+        summary="Частичное обновление курса",
+        description="Частичное обновление курса. Доступно владельцам и модераторам."
+    ),
+    destroy=extend_schema(
+        summary="Удаление курса",
+        description="Удаление курса. Доступно только владельцам. Модераторы не могут удалять курсы."
+    )
+)
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all().order_by('id')
     permission_classes = [IsAuthenticated]
@@ -61,6 +98,26 @@ class CourseViewSet(viewsets.ModelViewSet):
         return Course.objects.filter(owner=user).order_by('id')
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="Список уроков",
+        description="Получение списка уроков с пагинацией. "
+                   "Обычные пользователи видят только свои уроки. "
+                   "Модераторы видят все уроки.",
+        parameters=[
+            OpenApiParameter(
+                name='page_size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Количество элементов на странице (по умолчанию 10, максимум 30)'
+            ),
+        ]
+    ),
+    post=extend_schema(
+        summary="Создание урока",
+        description="Создание нового урока с валидацией YouTube ссылок. Не доступно для модераторов."
+    )
+)
 class LessonListCreateView(generics.ListCreateAPIView):
     queryset = Lesson.objects.all().order_by('id')
     serializer_class = LessonSerializer
@@ -89,6 +146,24 @@ class LessonListCreateView(generics.ListCreateAPIView):
         return Lesson.objects.filter(owner=user).order_by('id')
 
 
+@extend_schema_view(
+    get=extend_schema(
+        summary="Детали урока",
+        description="Получение детальной информации об уроке"
+    ),
+    put=extend_schema(
+        summary="Обновление урока",
+        description="Полное обновление урока. Доступно владельцам и модераторам."
+    ),
+    patch=extend_schema(
+        summary="Частичное обновление урока",
+        description="Частичное обновление урока. Доступно владельцам и модераторам."
+    ),
+    delete=extend_schema(
+        summary="Удаление урока",
+        description="Удаление урока. Доступно только владельцам. Модераторы не могут удалять уроки."
+    )
+)
 class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Lesson.objects.all().order_by('id')
     serializer_class = LessonSerializer
@@ -125,6 +200,58 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         return Lesson.objects.filter(owner=user).order_by('id')
 
 
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+
+@extend_schema(
+    methods=['POST'],
+    summary="Управление подпиской на курс",
+    description="Добавление или удаление подписки на курс. "
+               "Если подписка существует - она удаляется, если нет - создается.",
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'course_id': {
+                    'type': 'integer',
+                    'description': 'ID курса для подписки/отписки'
+                }
+            },
+            'required': ['course_id']
+        }
+    },
+    responses={
+        200: OpenApiResponse(
+            description="Успешное выполнение операции",
+            examples=[
+                OpenApiExample(
+                    'Подписка добавлена',
+                    value={'message': 'Подписка добавлена'}
+                ),
+                OpenApiExample(
+                    'Подписка удалена',
+                    value={'message': 'Подписка удалена'}
+                )
+            ]
+        ),
+        400: OpenApiResponse(
+            description="Ошибка валидации",
+            examples=[
+                OpenApiExample(
+                    'Не указан course_id',
+                    value={'error': 'course_id обязателен'}
+                )
+            ]
+        ),
+        404: OpenApiResponse(
+            description="Курс не найден"
+        )
+    }
+)
+@extend_schema(
+    methods=['GET'],
+    summary="Список подписок пользователя",
+    description="Получение списка всех подписок текущего пользователя"
+)
 class SubscriptionAPIView(APIView):
     """API для управления подписками на курсы"""
     permission_classes = [IsAuthenticated]
