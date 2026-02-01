@@ -4,6 +4,64 @@ from .models import Payment
 from .serializers import PaymentSerializer
 
 
+from rest_framework import filters, viewsets
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
+from .models import Payment
+from .serializers import PaymentSerializer
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Список платежей",
+        description="Получение списка платежей с возможностью фильтрации и сортировки",
+        parameters=[
+            OpenApiParameter(
+                name='ordering',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Сортировка по полю (например: payment_date, -payment_date)'
+            ),
+            OpenApiParameter(
+                name='course',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Фильтр по ID курса'
+            ),
+            OpenApiParameter(
+                name='lesson',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Фильтр по ID урока'
+            ),
+            OpenApiParameter(
+                name='payment_method',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Фильтр по способу оплаты (cash или transfer)'
+            ),
+        ]
+    ),
+    retrieve=extend_schema(
+        summary="Детали платежа",
+        description="Получение детальной информации о платеже"
+    ),
+    create=extend_schema(
+        summary="Создание платежа",
+        description="Создание нового платежа"
+    ),
+    update=extend_schema(
+        summary="Обновление платежа",
+        description="Полное обновление платежа"
+    ),
+    partial_update=extend_schema(
+        summary="Частичное обновление платежа",
+        description="Частичное обновление платежа"
+    ),
+    destroy=extend_schema(
+        summary="Удаление платежа",
+        description="Удаление платежа"
+    )
+)
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().select_related("user", "course", "lesson")
     serializer_class = PaymentSerializer
