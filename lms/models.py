@@ -16,6 +16,10 @@ class Course(models.Model):
         related_name='courses_owned',
         verbose_name="Владелец"
     )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Дата последнего обновления"
+    )
 
     class Meta:
         verbose_name = "Курс"
@@ -23,6 +27,12 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        """Переопределяем save для установки владельца по умолчанию"""
+        if not self.owner and hasattr(self, '_request_user'):
+            self.owner = self._request_user
+        super().save(*args, **kwargs)
 
 
 class Lesson(models.Model):

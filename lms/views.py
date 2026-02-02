@@ -8,6 +8,7 @@ from users.permissions import IsModerator, IsOwner
 from .models import Course, Lesson, Subscription
 from .serializers import CourseListSerializer, CourseDetailSerializer, LessonSerializer, SubscriptionSerializer
 from .paginators import CoursePagination, LessonPagination
+from .tasks import send_course_update_notification
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 
 
@@ -96,6 +97,15 @@ class CourseViewSet(viewsets.ModelViewSet):
         if user.groups.filter(name='moderators').exists():
             return Course.objects.all().order_by('id')
         return Course.objects.filter(owner=user).order_by('id')
+
+    def perform_update(self, serializer):
+        """При обновлении курса проверяем права и отправляем уведомления"""
+        instance = self.get_object()
+        if not (self.check_moderator_permission(self.request) or
+                self.check_owner_permission(instance, self.request)):
+            raise PermissionDenied("Вы не можете редактировать этот курс")
+        serializer.save()
+        send_course_update_notification.delay(instance.id)
 
 
 @extend_schema_view(
@@ -198,6 +208,25 @@ class LessonRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         if user.groups.filter(name='moderators').exists():
             return Lesson.objects.all().order_by('id')
         return Lesson.objects.filter(owner=user).order_by('id')
+
+    def perform_update(self, serializer):
+        """При обновлении урока проверяем права и отправляем уведомления"""
+        instance = self.get_object()
+        if not (self.check_moderator_permission(self.request) or
+                self.check_owner_permission(instance, self.request)):
+            raise PermissionDenied("Вы не можете редактировать этот урок")
+        serializer.save()
+        from django.utils import timezone
+        from datetime import timedelta
+
+        course = instance.course
+        four_hours_ago = timezone.now() - timedelta(hours=4)
+
+        if not course.updated_at or course.updated_at < four_hours_ago:
+            course.updated_at = timezone.now()
+            course.save(update_fields=['updated_at'])
+            from .tasks import send_course_update_notification
+            send_course_update_notification.delay(course.id)
 
 
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
