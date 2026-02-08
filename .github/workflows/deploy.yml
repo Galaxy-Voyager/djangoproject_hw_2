@@ -1,0 +1,122 @@
+name: Django CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/lms-platform
+  VERSION: ${{ github.sha }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Set up environment variables for tests
+      run: |
+        echo "SECRET_KEY=test-secret-key-for-github-actions" >> .env
+        echo "DEBUG=True" >> .env
+        echo "DB_NAME=test_db" >> .env
+        echo "DB_USER=test_user" >> .env
+        echo "DB_PASSWORD=test_password" >> .env
+        echo "DB_HOST=localhost" >> .env
+        echo "DB_PORT=5432" >> .env
+        echo "REDIS_HOST=localhost" >> .env
+        echo "REDIS_PORT=6379" >> .env
+        echo "REDIS_DB=0" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_dummy" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_dummy" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_dummy" >> .env
+
+    - name: Run migrations
+      run: |
+        python manage.py makemigrations
+        python manage.py migrate
+
+    - name: Run tests
+      run: |
+        python manage.py test lms.tests --verbosity=2
+
+    - name: Run custom tests
+      run: |
+        python manage.py test users.tests --verbosity=2
+        python manage.py test payments.tests --verbosity=2
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy to server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      run: |
+        # Копируем файлы на сервер
+        scp -r . $SERVER_USER@$SERVER_HOST:$DEPLOY_PATH
+        
+        # Выполняем скрипт деплоя на сервере
+        ssh $SERVER_USER@$SERVER_HOST "cd $DEPLOY_PATH && chmod +x deploy_server.sh && ./deploy_server.sh"
+
+    - name: Verify deployment
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      run: |
+        sleep 10  # Даем время приложению запуститься
+        curl -f http://${{ secrets.SERVER_HOST }}:8000/api/docs/ || exit 1

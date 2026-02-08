@@ -240,3 +240,16 @@ Thumbs.db
 # Volumes
 data/
 volumes/
+
+# GitHub Actions
+.github/workflows/*.log
+
+# SSH ключи
+sshfile
+sshfile.pub
+
+# Серверные файлы
+deploy_server.sh
+
+# Системные файлы
+*.sock
